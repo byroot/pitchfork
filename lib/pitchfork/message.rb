@@ -4,6 +4,12 @@
 # :stopdoc:
 module Pitchfork
   class MessageSocket
+    class << self
+      def for_fd(fd)
+        new(UNIXSocket.for_fd(fd))
+      end
+    end
+
     unless respond_to?(:ruby2_keywords, true)
       class << self
         def ruby2_keywords(*args)
@@ -27,6 +33,18 @@ module Pitchfork
       @socket.wait(*args)
     end
     ruby2_keywords :wait
+
+    def fileno
+      @socket.fileno
+    end
+
+    def close_on_exec?
+      @socket.close_on_exec?
+    end
+
+    def close_on_exec=(close_on_exec)
+      @socket.close_on_exec = close_on_exec
+    end
 
     def close_read
       @socket.close_read

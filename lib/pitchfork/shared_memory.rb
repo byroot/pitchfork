@@ -13,6 +13,22 @@ module Pitchfork
 
     PAGES = []
 
+    def fds
+      PAGES.map(&:fileno)
+    end
+
+    def reopen(fds)
+      fds.each do |fd|
+        page = MemoryPage.for_fd(fd)
+        page.close_on_exec = true
+        PAGES << page
+      end
+    end
+
+    def close_on_exec=(close_on_exec)
+      PAGES.each { |p| p.close_on_exec = close_on_exec }
+    end
+
     def close_on_exec=(close_on_exec)
       PAGES.each { |p| p.close_on_exec = close_on_exec }
     end
