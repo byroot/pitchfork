@@ -745,6 +745,7 @@ module Pitchfork
         @promotion_lock.try_lock
         mold.after_fork_in_child
         build_app!
+        mold.start_promotion(@control_socket[1])
         mold_loop(mold)
       end
       @promotion_lock.at_fork
@@ -1001,7 +1002,7 @@ module Pitchfork
       @sig_queue.clear
       @children = nil
 
-      after_worker_fork.call(self, worker) # can drop perms and create listeners
+      after_worker_fork&.call(self, worker) # can drop perms and create listeners
       LISTENERS.each { |sock| sock.close_on_exec = true }
 
       @config = nil
@@ -1027,7 +1028,7 @@ module Pitchfork
 
     def init_mold_process(mold)
       proc_name role: "(gen:#{mold.generation}) mold", status: "init"
-      after_mold_fork.call(self, mold)
+      after_mold_fork&.call(self, mold)
       readers = [mold]
       trap(:QUIT) { nuke_listeners!(readers) }
       trap(:TERM) { nuke_listeners!(readers) }
