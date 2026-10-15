@@ -12,6 +12,9 @@ module MakeMakefile
       log_open
       yield
     end
+
+    def self::log_close
+    end
   end
 end
 
