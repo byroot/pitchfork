@@ -2,6 +2,13 @@
 # frozen_string_literal: true
 require 'mkmf'
 
+module DebugMkmf
+  def try_do(src, command, **opts, &b)
+    p [:try_do, src, command, opts, b]
+    super
+  end
+end
+
 append_cflags("-fvisibility=hidden")
 append_cflags("-std=c99")
 
