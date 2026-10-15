@@ -9,6 +9,8 @@ module DebugMkmf
   end
 end
 
+Object.prepend(DebugMkmf)
+
 append_cflags("-fvisibility=hidden")
 append_cflags("-std=c99")
 
