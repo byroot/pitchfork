@@ -4,16 +4,69 @@ require 'mkmf'
 
 module MakeMakefile
   module Logging
+    @log = nil
+    @logfile = 'mkmf.log'
+    @orgerr = $stderr.dup
+    @orgout = $stdout.dup
+    @postpone = 0
+    @quiet = $extmk
+
     def self::log_open
-      @log ||= $stderr
+      @log ||= @orgerr
+      @log.sync = true
+    end
+
+    def self::log_opened?
+      @log and not @log.closed?
     end
 
     def self::open
       log_open
+      $stderr.reopen(@log)
+      $stdout.reopen(@log)
       yield
+    ensure
+      $stderr.reopen(@orgerr)
+      $stdout.reopen(@orgout)
+    end
+
+    def self::message(*s)
+      log_open
+      @log.printf(*s)
+    end
+
+    def self::logfile file
+      @logfile = file
+      log_close
     end
 
     def self::log_close
+      # if @log and not @log.closed?
+      #   @log.flush
+      #   @log.close
+      #   @log = nil
+      # end
+    end
+
+    def self::postpone
+      tmplog = "mkmftmp#{@postpone += 1}.log"
+      open do
+        log, *save = @log, @logfile, @orgout, @orgerr
+        @log, @logfile, @orgout, @orgerr = nil, tmplog, log, log
+        begin
+          log.print(open {yield @log})
+        ensure
+          # @log.close if @log and not @log.closed?
+          File::open(tmplog) {|t| FileUtils.copy_stream(t, log)} if File.exist?(tmplog)
+          @log, @logfile, @orgout, @orgerr = log, *save
+          @postpone -= 1
+          MakeMakefile.rm_f tmplog
+        end
+      end
+    end
+
+    class << self
+      attr_accessor :quiet
     end
   end
 end
