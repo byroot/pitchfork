@@ -2,14 +2,18 @@
 # frozen_string_literal: true
 require 'mkmf'
 
-module DebugMkmf
-  def try_do(src, command, **opts, &b)
-    p [:try_do, src, command, opts, b]
-    super
+module MakeMakefile
+  module Logging
+    def self::log_open
+      @log ||= $stderr
+    end
+
+    def self::open
+      log_open
+      yield
+    end
   end
 end
-
-Object.prepend(DebugMkmf)
 
 append_cflags("-fvisibility=hidden")
 append_cflags("-std=c99")
