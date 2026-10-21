@@ -864,11 +864,6 @@ module Pitchfork
       # If we're already in the middle of forking a new generation, we just continue
       return if REFORKING_AVAILABLE && !@children.mold
 
-      # We don't shutdown any outdated worker if any worker is already being
-      # spawned or a worker is exiting. Only 10% of workers can be reforked at
-      # once to minimize the impact on capacity.
-      workers_to_restart = refork_max_unavailable - @children.restarting_workers_count
-
       if service = @children.service
         if service.outdated?
           if service.soft_kill(:TERM)
@@ -879,17 +874,11 @@ module Pitchfork
         end
       end
 
+      # We don't shutdown any outdated worker if too many workers are already being
+      # spawned or exiting. Only `refork_max_unavailable` workers can be restarting at
+      # once to minimize the impact on capacity.
+      workers_to_restart = refork_max_unavailable - @children.restarting_workers_count
       if workers_to_restart > 0
-        outdated_workers = @children.workers.select { |w| !w.exiting? && w.outdated? }
-
-        # Restart the most outdated workers first, can happen if a
-        # restart or refork was triggered before the previous one was
-        # done fully rolling out.
-        # NB: Array#sort_by isn't guaranteed stable so we use the original order as the
-        # last ordering criteria.
-        indexes = outdated_workers.each_with_index.to_h
-        outdated_workers = outdated_workers.sort_by { |w| [w.version, w.generation, indexes[w]] }
-
         outdated_workers.each do |worker|
           if worker.soft_kill(:TERM)
             logger.info("Sent SIGTERM to #{worker.to_log}")
@@ -900,6 +889,18 @@ module Pitchfork
           break if workers_to_restart <= 0
         end
       end
+    end
+
+    def outdated_workers
+      outdated_workers = @children.workers.select { |w| !w.exiting? && w.outdated? }
+
+      # Restart the most outdated workers first, can happen if a
+      # restart or refork was triggered before the previous one was
+      # done fully rolling out.
+      # NB: Array#sort_by isn't guaranteed stable so we use the original order as the
+      # last ordering criteria.
+      indexes = outdated_workers.each_with_index.to_h
+      outdated_workers.sort_by { |w| [w.version, w.generation, indexes[w]] }
     end
 
     # if we get any error, try to write something back to the client
