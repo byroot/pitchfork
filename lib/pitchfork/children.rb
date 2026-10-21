@@ -172,7 +172,7 @@ module Pitchfork
     end
 
     def each(&block)
-      @children.each_value(&block)
+      (@children.values + @pending_workers.values + @pending_molds.values).each(&block)
     end
 
     def each_worker(&block)
