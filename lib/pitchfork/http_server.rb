@@ -597,7 +597,7 @@ module Pitchfork
     def hard_timeout(child)
       if child.pid.nil? # Not yet registered, likely never spawned
         logger.error "#{child.to_log} timed out during spawn, abandoning"
-        @children.abandon(worker)
+        @children.abandon(child)
         return
       end
 
@@ -797,6 +797,7 @@ module Pitchfork
           next
         end
         worker = Worker.new(worker_nr)
+        worker.update_deadline(@spawn_timeout)
 
         if REFORKING_AVAILABLE
           worker.version = @children.mold&.version || 0
@@ -1186,45 +1187,7 @@ module Pitchfork
           while sock = ready.shift
             # Pitchfork::Worker#accept_nonblock is not like accept(2) at all,
             # but that will return false
-            message = sock.accept_nonblock(exception: false)
-            case message
-            when false
-              # no message, keep looping
-            when Message::SpawnWorker
-              retries = 1
-              begin
-                spawn_worker(Worker.new(message.nr, generation: mold.generation, version: mold.version), detach: true)
-              rescue ForkFailure
-                if retries > 0
-                  @logger.fatal("#{mold.to_log} failed to spawn a worker, retrying")
-                  retries -= 1
-                  retry
-                else
-                  @logger.fatal("#{mold.to_log} failed to spawn a worker twice in a row - corrupted mold process?")
-                  Process.exit(1)
-                end
-              rescue => error
-                raise BootFailure, error.message
-              end
-            when Message::SpawnService
-              retries = 1
-              begin
-                spawn_service(Pitchfork::Worker.new(nil, generation: mold.generation, version: mold.version, service: true), detach: true)
-              rescue ForkFailure
-                if retries > 0
-                  @logger.fatal("#{mold.to_log} failed to spawn a service, retrying")
-                  retries -= 1
-                  retry
-                else
-                  @logger.fatal("#{mold.to_log} failed to spawn a service twice in a row - corrupted mold process?")
-                  Process.exit(1)
-                end
-              rescue => error
-                raise BootFailure, error.message
-              end
-            else
-              logger.error("Unexpected mold message #{message.inspect}")
-            end
+            mold_handle_message(mold, sock.accept_nonblock(exception: false))
           end
 
           # timeout so we can .tick and keep parent from SIGKILL-ing us
@@ -1233,6 +1196,47 @@ module Pitchfork
         rescue => e
           Pitchfork.log_error(@logger, "mold loop error", e) if readers[0]
         end
+      end
+    end
+
+    def mold_handle_message(mold, message)
+      case message
+      when false
+        # no message, keep looping
+      when Message::SpawnWorker
+        retries = 1
+        begin
+          spawn_worker(Worker.new(message.nr, generation: mold.generation, version: mold.version), detach: true)
+        rescue ForkFailure
+          if retries > 0
+            @logger.fatal("#{mold.to_log} failed to spawn a worker, retrying")
+            retries -= 1
+            retry
+          else
+            @logger.fatal("#{mold.to_log} failed to spawn a worker twice in a row - corrupted mold process?")
+            Process.exit(1)
+          end
+        rescue => error
+          raise BootFailure, error.message
+        end
+      when Message::SpawnService
+        retries = 1
+        begin
+          spawn_service(Pitchfork::Worker.new(nil, generation: mold.generation, version: mold.version, service: true), detach: true)
+        rescue ForkFailure
+          if retries > 0
+            @logger.fatal("#{mold.to_log} failed to spawn a service, retrying")
+            retries -= 1
+            retry
+          else
+            @logger.fatal("#{mold.to_log} failed to spawn a service twice in a row - corrupted mold process?")
+            Process.exit(1)
+          end
+        rescue => error
+          raise BootFailure, error.message
+        end
+      else
+        logger.error("Unexpected mold message #{message.inspect}")
       end
     end
 
