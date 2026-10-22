@@ -78,7 +78,7 @@ module Pitchfork
 
     # :stopdoc:
     attr_accessor :app, :timeout, :timeout_signal, :soft_timeout, :cleanup_timeout, :spawn_timeout, :worker_processes,
-                  :before_fork, :after_worker_fork, :after_mold_fork, :before_service_worker_ready, :before_service_worker_exit,
+                  :before_fork, :after_worker_fork, :after_mold_fork, :after_mold_ready, :before_service_worker_ready, :before_service_worker_exit,
                   :listener_opts, :children,
                   :orig_app, :config, :ready_pipe, :early_hints, :setpgid, :restart_command, :restart_command_argv, :working_directory
     attr_writer   :after_worker_exit, :before_worker_exit, :after_worker_ready, :after_request_complete,
@@ -226,7 +226,9 @@ module Pitchfork
       else
         build_app!
         SharedMemory.current_version = @version
-        after_mold_fork&.call(self, Worker.new(nil, pid: $$).promoted!(@spawn_timeout))
+        mold = Worker.new(nil, pid: $$).promoted!(@spawn_timeout)
+        after_mold_fork&.call(self, mold)
+        after_mold_ready&.call(self, mold)
       end
 
       if sync
@@ -1178,6 +1180,7 @@ module Pitchfork
       waiter = prep_readers(readers)
       @promotion_lock.unlock
       ready = readers.dup
+      run_callback!(@after_mold_ready, "after_mold_ready", self, mold)
 
       mold.finish_promotion(@control_socket[1])
       mold.ready = true

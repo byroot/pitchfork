@@ -42,6 +42,7 @@ module Pitchfork
       :before_fork => nil,
       :after_worker_fork => nil,
       :after_mold_fork => nil,
+      :after_mold_ready => nil,
       :before_worker_exit => nil,
       :after_worker_exit => lambda { |server, worker, status|
         m = if worker.nil?
@@ -143,6 +144,10 @@ module Pitchfork
     end
 
     def after_mold_fork(*args, &block)
+      set_hook(:after_mold_fork, block_given? ? block : args[0])
+    end
+
+    def after_mold_ready(*args, &block)
       set_hook(:after_mold_fork, block_given? ? block : args[0])
     end
 
