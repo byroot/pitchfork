@@ -372,6 +372,20 @@ issues caused by forking. If you detect something wrong, you can
 call `Process.exit`, and this mold won't be used, another one will be
 spawned later. e.g. you can check `Socket.getaddrinfo` still works, etc.
 
+
+### `after_mold_ready`
+Called by a mold process after it has been fully loaded, directly before it
+notifies the monitor it is ready to spawn workers:
+
+```ruby
+after_mold_ready do |server, mold|
+  server.logger.info("#{mold.to_log} ready")
+end
+```
+
+Like `after_mold_fork`, if this callback raises, the mold exits and won't be used.
+
+
 ### `after_worker_fork`
 
 ```ruby
