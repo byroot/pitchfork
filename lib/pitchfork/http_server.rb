@@ -411,8 +411,13 @@ module Pitchfork
           logger.info("reaped unknown subprocess #{message.status.inspect}")
         end
       when Message::WorkerSpawned, Message::MoldSpawned, Message::ServiceSpawned
-        worker = @children.update(message)
-        logger.info("#{worker.to_log} spawned")
+        if worker = @children.update(message)
+          logger.info("#{worker.to_log} spawned")
+        else
+          logger.error("worker=#{message.nr} gen=#{message.version}.#{message.generation} pid=#{message.pid} spawned but slot is taken, killing")
+          message.pipe.close
+          kill_worker(@timeout_signal.call(message.pid), message.pid)
+        end
       when Message::MoldReady
         new_mold = @children.update(message)
 
