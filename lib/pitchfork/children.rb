@@ -97,7 +97,12 @@ module Pitchfork
         return service
       end
 
-      child = @children[message.pid] || (message.nr && @workers[message.nr])
+      unless child = @children[message.pid]
+        child = message.nr && @workers[message.nr]
+        # An abandoned spawn may still come up late: never rebind a slot that already has a process.
+        return if child.nil? || child.pid
+      end
+
       child.update(message)
 
       if child.mold?
@@ -126,10 +131,10 @@ module Pitchfork
 
     def reap(pid)
       if child = @children.delete(pid)
-        @pending_workers.delete(child.nr)
+        @pending_workers.delete(child.nr) if @pending_workers[child.nr].equal?(child)
         @pending_molds.delete(child.pid)
         @molds.delete(child.pid)
-        @workers.delete(child.nr)
+        @workers.delete(child.nr) if @workers[child.nr].equal?(child)
 
         if @mold == child
           @pending_workers.reject! do |nr, worker|
