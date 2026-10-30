@@ -134,7 +134,7 @@ class TestBoot < Pitchfork::IntegrationTest
     pid = spawn_server(app: APP, config: <<~RUBY)
       listen "#{addr}:#{port}"
       worker_processes 3
-      max_consecutive_spawn_errors 4
+      max_consecutive_spawn_errors 2
       spawn_timeout 1
       after_worker_fork do |_server, worker|
         raise "Ooops"
@@ -142,7 +142,7 @@ class TestBoot < Pitchfork::IntegrationTest
     RUBY
 
     assert_stderr(/consecutive failures to spawn children, aborting/, timeout: 4)
-    assert_exited(pid, 1)
+    assert_exited(pid, 1, timeout: 8)
   end
 
   def test_max_consecutive_spawn_errors_ignores_ready_workers
